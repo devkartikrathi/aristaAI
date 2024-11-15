@@ -180,4 +180,4 @@ def get_suggestions():
         return jsonify({"error": "Failed to generate suggestions", "details": str(e)}), 500
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    app.run()
