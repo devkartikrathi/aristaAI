@@ -16,7 +16,7 @@ load_dotenv()
 app = Flask(__name__)
 CORS(app)
 
-app.config['SECRET_KEY'] = os.getenv("SECRET_KEY")
+SECRET_KEY = os.getenv('SECRET_KEY')
 
 MONGO_URI = os.getenv("MONGO_URI")
 mongo_client = MongoClient(MONGO_URI)
@@ -24,7 +24,7 @@ db = mongo_client['travel_assistant']
 trips_collection = db['trips']
 users_collection = db['users']
 
-genai.configure(api_key=os.getenv("API_KEY"))
+api_key = os.environ["GEMINI_API_KEY"]
 model = genai.GenerativeModel("gemini-1.5-pro")
 
 @app.route('/')
@@ -43,7 +43,7 @@ def register():
     if users_collection.find_one({"username": username}):
         return jsonify({"error": "Username already exists"}), 400
 
-    hashed_password = generate_password_hash(password, method='sha256')
+    hashed_password = generate_password_hash(password, method='scrypt')
     users_collection.insert_one({"username": username, "password": hashed_password})
 
     return jsonify({"message": "User registered successfully"})
@@ -62,7 +62,14 @@ def login():
     if not user or not check_password_hash(user['password'], password):
         return jsonify({"error": "Invalid username or password"}), 401
 
-    token = jwt.encode({'username': username, 'exp': datetime.datetime.utcnow() + datetime.timedelta(hours=24)}, app.config['SECRET_KEY'], algorithm='HS256')
+    token = jwt.encode(
+        {
+            'username': username,
+            'exp': datetime.datetime.now(datetime.timezone.utc)
+            + datetime.timedelta(hours=24),
+        },
+        SECRET_KEY,
+    )
 
     return jsonify({"token": token})
 
@@ -110,21 +117,23 @@ def generate_packing_list():
     if not destination or not purpose or not duration or not weather:
         return jsonify({"error": "All fields are required"}), 400
 
-    prompt = (f"As a travel assistant, help me pack for a trip to {destination} for {purpose}. "
-              f"The trip lasts {duration} and the weather is {weather}. What should I pack?")
+    prompt = (f"Generate a packing list JSON for a {duration} trip to {destination} for {purpose} with {weather} weather. "
+              f"The JSON should be a valid JSON array of objects. Each object should have 'name' (string), 'checked' (boolean, initially false), 'compartment' (string), and 'weight' (float, estimated weight in kg). "
+              f"Ensure the output is directly parsable as a JSON array with no extra text or formatting.")
 
     try:
         response = model.generate_content(prompt)
-        packing_list = response.text.split('\n')
+        packing_list = json.loads(response.text)
 
-        packing_items = [{"name": item, "checked": False, "compartment": "Main Compartment"} for item in packing_list]
+        # Calculate total weight
+        total_weight = sum(item.get('weight', 0) for item in packing_list)
 
         trips_collection.update_one(
             {"_id": trip_id},
-            {"$set": {"packing_list": packing_items}}
+            {"$set": {"packing_list": packing_list, "total_weight": total_weight}}
         )
 
-        return jsonify({"message": "Packing list generated and added to the trip", "packing_list": packing_items})
+        return jsonify({"message": "Packing list generated and added to the trip", "packing_list": packing_list, "total_weight": total_weight})
 
     except Exception as e:
         return jsonify({"error": "Failed to generate packing list", "details": str(e)}), 500
@@ -138,14 +147,17 @@ def edit_packing_list():
     if not trip_id or not updated_items:
         return jsonify({"error": "Trip ID and updated items are required"}), 400
 
+    # Calculate total weight
+    total_weight = sum(item.get('weight', 0) for item in updated_items)
+
     trip = trips_collection.find_one({"_id": trip_id})
 
     if trip:
         trips_collection.update_one(
             {"_id": trip_id},
-            {"$set": {"packing_list": updated_items}}
+            {"$set": {"packing_list": updated_items, "total_weight": total_weight}}
         )
-        return jsonify({"message": "Packing list updated", "updated_items": updated_items})
+        return jsonify({"message": "Packing list updated", "updated_items": updated_items, "total_weight": total_weight})
     else:
         return jsonify({"error": "Trip not found"}), 404
 

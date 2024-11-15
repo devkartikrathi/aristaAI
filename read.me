@@ -1,0 +1,265 @@
+Here's a structured README file for your Flask-based Travel Assistant API, including detailed setup instructions, endpoints, and usage examples.
+
+---
+
+# Travel Assistant API
+
+This is a Flask-based API for managing travel-related features, such as adding trip details, generating packing lists, assigning luggage items, and receiving travel suggestions. It connects to MongoDB to store trip information and uses Gemini AI for generating packing lists and suggestions.
+
+## Features
+
+- Add and store trip details
+- Generate packing lists based on trip information
+- Assign items to different luggage compartments
+- Get travel suggestions for specific destinations
+
+## Tech Stack
+
+- **Backend**: Flask (Python)
+- **Database**: MongoDB
+- **AI Integration**: Gemini AI by Google
+- **Environment Variables**: Managed using `python-dotenv`
+
+## Prerequisites
+
+Before running the application, make sure you have the following installed:
+
+- Python 3.x
+- MongoDB
+- An account for [Gemini AI by Google](https://developers.generativeai.google/), and an API key.
+- A `.env` file with the following environment variables set:
+  - `MONGO_URI`: MongoDB connection string
+  - `API_KEY`: Gemini AI API Key
+
+## Installation
+
+1. **Clone the Repository:**
+
+   ```bash
+   git clone https://github.com/your-username/travel-assistant-api.git
+   cd travel-assistant-api
+   ```
+
+2. **Create and Activate a Virtual Environment:**
+
+   ```bash
+   python -m venv venv
+   source venv/bin/activate  # On Windows: venv\Scripts\activate
+   ```
+
+3. **Install Dependencies:**
+
+   ```bash
+   pip install -r requirements.txt
+   ```
+
+4. **Set Up Environment Variables:**
+
+   Create a `.env` file in the root directory of the project and add the following:
+
+   ```
+   MONGO_URI=your_mongo_db_connection_string
+   API_KEY=your_gemini_ai_api_key
+   ```
+
+5. **Run the Application:**
+
+   ```bash
+   python app.py
+   ```
+
+   The server will run on `http://127.0.0.1:5000`.
+
+## API Endpoints
+
+### 1. Home (`GET /`)
+
+Returns a welcome message.
+
+- **Request**: None
+- **Response**:
+
+   ```json
+   {
+     "message": "Welcome to the Travel Assistant API"
+   }
+   ```
+
+### 2. Add Trip (`POST /add_trip`)
+
+Adds a new trip to the database.
+
+- **Request Body**:
+
+   ```json
+   {
+     "destination": "New York City",
+     "purpose": "Business",
+     "duration": "7 days",
+     "weather": "Cold"
+   }
+   ```
+
+- **Response**:
+
+   ```json
+   {
+     "_id": {"$oid": "your_trip_id"},
+     "destination": "New York City",
+     "purpose": "Business",
+     "duration": "7 days",
+     "weather": "Cold",
+     "packing_list": []
+   }
+   ```
+
+### 3. Generate Packing List (`POST /generate_packing_list`)
+
+Generates a packing list based on the trip details.
+
+- **Request Body**:
+
+   ```json
+   {
+     "destination": "New York City",
+     "purpose": "Business",
+     "duration": "7 days",
+     "weather": "Cold"
+   }
+   ```
+
+- **Response**:
+
+   ```json
+   {
+     "packing_list": "Generated packing list as text"
+   }
+   ```
+
+### 4. Assign Luggage (`POST /assign_luggage`)
+
+Assigns items to the trip's packing list (luggage compartments).
+
+- **Request Body**:
+
+   ```json
+   {
+     "trip_id": "your_trip_id",
+     "items": [
+       "Winter coat",
+       "Business shoes",
+       "Laptop charger"
+     ]
+   }
+   ```
+
+- **Response**:
+
+   ```json
+   {
+     "message": "Items assigned to luggage",
+     "items": [
+       "Winter coat",
+       "Business shoes",
+       "Laptop charger"
+     ]
+   }
+   ```
+
+### 5. Get Suggestions (`POST /get_suggestions`)
+
+Returns travel suggestions, such as places to visit or time management tips for the destination.
+
+- **Request Body**:
+
+   ```json
+   {
+     "destination": "New York City"
+   }
+   ```
+
+- **Response**:
+
+   ```json
+   {
+     "suggestions": "Travel tips for New York City"
+   }
+   ```
+
+## Testing the API
+
+You can test the API using Postman or any API client. Below are the steps to test:
+
+1. **Add Trip Example:**
+
+   - Method: `POST`
+   - URL: `http://127.0.0.1:5000/add_trip`
+   - Body (raw JSON):
+
+     ```json
+     {
+       "destination": "New York City",
+       "purpose": "Business",
+       "duration": "7 days",
+       "weather": "Cold"
+     }
+     ```
+
+2. **Generate Packing List Example:**
+
+   - Method: `POST`
+   - URL: `http://127.0.0.1:5000/generate_packing_list`
+   - Body (raw JSON):
+
+     ```json
+     {
+       "destination": "New York City",
+       "purpose": "Business",
+       "duration": "7 days",
+       "weather": "Cold"
+     }
+     ```
+
+3. **Assign Luggage Example:**
+
+   - Method: `POST`
+   - URL: `http://127.0.0.1:5000/assign_luggage`
+   - Body (raw JSON):
+
+     ```json
+     {
+       "trip_id": "your_trip_id",
+       "items": [
+         "Winter coat",
+         "Business shoes",
+         "Laptop charger"
+       ]
+     }
+     ```
+
+4. **Get Suggestions Example:**
+
+   - Method: `POST`
+   - URL: `http://127.0.0.1:5000/get_suggestions`
+   - Body (raw JSON):
+
+     ```json
+     {
+       "destination": "New York City"
+     }
+     ```
+
+## Deployment
+
+For deployment, consider using a production server like **Gunicorn** and hosting platforms such as **Heroku**, **AWS**, or **Google Cloud**.
+
+### Example Deployment with Gunicorn:
+
+```bash
+pip install gunicorn
+gunicorn -w 4 app:app
+```
+
+## License
+
+This project is licensed under the MIT License.
