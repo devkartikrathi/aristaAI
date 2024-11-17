@@ -118,28 +118,25 @@ def generate_packing_list():
         return jsonify({"error": "All fields are required"}), 400
 
     prompt = (f"Generate a packing list JSON for a {duration} trip to {destination} for {purpose} with {weather} weather. "
-              f"The JSON should be a valid JSON array of objects. Each object should have 'name' (string), 'checked' (boolean, initially false), 'compartment' (string), and 'weight' (float, estimated weight in kg). "
-              f"Ensure the output is directly parsable as a JSON array with no extra text or formatting.")
+            f"The JSON should be a valid JSON array of objects. Each object should have 'name' (string), 'checked' (boolean, initially false), and 'compartment' (string). "
+            f"Ensure the output is directly parsable as a JSON array with no extra text or formatting.")
 
     try:
         response = model.generate_content(prompt)
         packing_list = json.loads(response.text)
 
-        # Calculate total weight
-        total_weight = sum(item.get('weight', 0) for item in packing_list)
-
         trips_collection.update_one(
             {"_id": trip_id},
-            {"$set": {"packing_list": packing_list, "total_weight": total_weight}}
+            {"$set": {"packing_list": packing_list}}
         )
 
-        return jsonify({"message": "Packing list generated and added to the trip", "packing_list": packing_list, "total_weight": total_weight})
+        return jsonify({"message": "Packing list generated and added to the trip", "packing_list": packing_list})
 
     except Exception as e:
         return jsonify({"error": "Failed to generate packing list", "details": str(e)}), 500
 
 @app.route('/edit_packing_list', methods=['POST'])
-def edit_packing_list():
+def edit_packing_list(): 
     data = request.json
     trip_id = ObjectId(data.get('trip_id'))
     updated_items = data.get('items')
@@ -147,17 +144,52 @@ def edit_packing_list():
     if not trip_id or not updated_items:
         return jsonify({"error": "Trip ID and updated items are required"}), 400
 
-    # Calculate total weight
-    total_weight = sum(item.get('weight', 0) for item in updated_items)
-
-    trip = trips_collection.find_one({"_id": trip_id})
-
-    if trip:
+    if trip := trips_collection.find_one({"_id": trip_id}):
         trips_collection.update_one(
             {"_id": trip_id},
-            {"$set": {"packing_list": updated_items, "total_weight": total_weight}}
+            {"$set": {"packing_list": updated_items}}
         )
-        return jsonify({"message": "Packing list updated", "updated_items": updated_items, "total_weight": total_weight})
+        return jsonify({"message": "Packing list updated", "updated_items": updated_items})
+    else:
+        return jsonify({"error": "Trip not found"}), 404
+
+@app.route('/delete_trip', methods=['DELETE'])
+def delete_trip():
+    data = request.json
+    trip_id = ObjectId(data.get('trip_id'))
+
+    if not trip_id:
+        return jsonify({"error": "Trip ID is required"}), 400
+
+    result = trips_collection.delete_one({"_id": trip_id})
+
+    if result.deleted_count == 1:
+        return jsonify({"message": "Trip deleted successfully"})
+    else:
+        return jsonify({"error": "Trip not found"}), 404
+
+@app.route('/edit_trip', methods=['PUT'])
+def edit_trip():
+    data = request.json
+    trip_id = ObjectId(data.get('trip_id'))
+    updated_fields = {
+        "destination": data.get('destination'),
+        "purpose": data.get('purpose'),
+        "duration": data.get('duration'),
+        "weather": data.get('weather'),
+        "trip_date": data.get('trip_date')
+    }
+
+    if not trip_id or not all(updated_fields.values()):
+        return jsonify({"error": "Trip ID and all fields are required"}), 400
+
+    result = trips_collection.update_one(
+        {"_id": trip_id},
+        {"$set": updated_fields}
+    )
+
+    if result.matched_count == 1:
+        return jsonify({"message": "Trip updated successfully"})
     else:
         return jsonify({"error": "Trip not found"}), 404
 
@@ -165,11 +197,12 @@ def edit_packing_list():
 def get_suggestions():
     data = request.json
     destination = data.get('destination')
+    purpose = data.get('purpose')
 
-    if not destination:
-        return jsonify({"error": "Destination is required"}), 400
+    if not destination or not purpose:
+        return jsonify({"error": "Destination and purpose are required"}), 400
 
-    prompt = (f"Provide travel tips for {destination}, including must-see places and time management advice.")
+    prompt = (f"Provide travel tips for a {purpose} trip to {destination}, including must-see places, time management advice, and a suggested timeline for activities.")
 
     try:
         response = model.generate_content(prompt)
