@@ -51,14 +51,14 @@ def generate_packing_list():
             // Add more categories like Electronics, Toiletries, Documents, Essentials
             },
             "total_estimated_weight_grams": 8700
-              """)
+              """
+              f"Ensure the output is directly parsable as a JSON array with no extra text or formatting.")
     
     try:
         response = model.generate_content(prompt)
         packing_list = json.loads(response.text)
 
         return jsonify({
-            "message": "Packing list generated and added to the trip",
             "packing_list": packing_list
         })
 
@@ -73,49 +73,70 @@ def get_suggestions():
     duration = data.get('duration')
     traveler = data.get('traveler')
 
-    if not destination or not purpose:
-        return jsonify({"error": "Destination and purpose are required"}), 400
-
     prompt = (f"""
-              Create a detailed day-by-day travel itinerary for a traveler visiting {destination} for {duration} days. The purpose of the visit is {purpose}, and the traveler type is [TRAVELER TYPE: {traveler}]. The itinerary should include major attractions, suggested timings, local travel tips, and estimated daily expenses. You can also add Must-see places and attractions, Local customs and etiquette, Transportation tips, Safety tips.\n"""
+You are an expert travel planner AI. Create a detailed day-by-day travel itinerary for a traveler visiting {destination} for {duration} days. The purpose of the visit is {purpose}, and the traveler type is {traveler}. 
 
-            """Present the itinerary in the following JSON format:
-            {
-            "itinerary": [
-                {
-                "day": 1,
-                "title": "Day 1: Arrival and City Exploration",
-                "activities": [
-                    {
-                    "time": "9:00 AM",
-                    "description": "Check-in at hotel and freshen up"
-                    },
-                    {
-                    "time": "11:00 AM",
-                    "description": "Visit Tokyo Skytree",
-                    "estimated_cost_usd": 25
-                    }
-                ],
-                "total_estimated_cost_usd": 60
-                }
-                // More days here
-            ],
-            "local_emergency_contacts": {
-                "police": "110",
-                "ambulance": "119",
-                "fire": "119",
-                "nearest_embassy": {
-                "country": "India",
-                "phone": "+81-3-3262-2391",
-                "address": "2-2-11 Kudan-Minami, Chiyoda-ku, Tokyo 102-0074"
-                }
-            },
-            "currency_info": {
-                "local_currency": "Japanese Yen (JPY)",
-                "conversion_rate_to_ind": 0.57
-            }
-            }
-            """)
+You MUST include a full itinerary for each day (DO NOT leave the 'itinerary' array empty). Each day should have:
+- A title
+- A list of 2–4 activities with time and description
+- Estimated daily cost in USD
+
+In addition, include:
+- Must-see places and attractions
+- Local customs and etiquette
+- Transportation tips
+- Safety tips
+- Local emergency contact numbers
+- Currency exchange info (conversion rate to INR)
+
+Respond ONLY with a valid raw JSON object. DO NOT include any markdown, explanations, or formatting.
+
+Use this exact JSON schema:
+"""
++ """
+{
+  "itinerary": [
+    {
+      "day": 1,
+      "title": "Day 1: Arrival and City Exploration",
+      "activities": [
+        {
+          "time": "9:00 AM",
+          "description": "Check-in at hotel and freshen up"
+        },
+        {
+          "time": "11:00 AM",
+          "description": "Visit Tokyo Skytree",
+          "estimated_cost_usd": 25
+        }
+      ],
+      "total_estimated_cost_usd": 60
+    }
+    // More days here
+  ],
+  "local_emergency_contacts": {
+    "police": "110",
+    "ambulance": "119",
+    "fire": "119",
+    "nearest_embassy": {
+      "country": "India",
+      "phone": "+81-3-3262-2391",
+      "address": "2-2-11 Kudan-Minami, Chiyoda-ku, Tokyo 102-0074"
+    }
+  },
+  "currency_info": {
+    "local_currency": "Japanese Yen (JPY)",
+    "conversion_rate_to_inr": 0.57
+  },
+  "must_see_places": [],
+  "local_customs_and_etiquette": [],
+  "transportation_tips": [],
+  "safety_tips": []
+}
+"""
++ "\nMake sure the 'itinerary' section contains at least one day per trip day. No empty arrays. Respond only with valid JSON. Ensure the output is directly parsable as a JSON array with no extra text or formatting."
+
+)
 
     try:
         response = model.generate_content(prompt)
