@@ -17,315 +17,105 @@ load_dotenv()
 app = Flask(__name__)
 CORS(app)
 
-# SECRET_KEY = os.getenv('SECRET_KEY')
-
-# MONGO_URI = os.getenv("MONGO_URI")
-# mongo_client = MongoClient(MONGO_URI)
-# db = mongo_client['travel_assistant']
-# trips_collection = db['trips']
-# users_collection = db['users']
-
 genai.configure(api_key=os.environ["GEMINI_API_KEY"])
 model = genai.GenerativeModel("gemini-1.5-pro")
-
-# def token_required(f):
-#     @wraps(f)
-#     def decorated(*args, **kwargs):
-#         token = None
-#         auth_header = request.headers.get('Authorization')
-
-#         if auth_header and auth_header.startswith('Bearer '):
-#             token = auth_header.split(' ')[1]
-
-#         if not token:
-#             return jsonify({'error': 'Token is missing'}), 401
-
-#         try:
-#             data = jwt.decode(token, SECRET_KEY, algorithms=["HS256"])
-#             current_user = users_collection.find_one({"username": data['username']})
-#             if not current_user:
-#                 return jsonify({'error': 'Invalid token'}), 401
-#         except jwt.ExpiredSignatureError:
-#             return jsonify({'error': 'Token has expired'}), 401
-#         except jwt.InvalidTokenError:
-#             return jsonify({'error': 'Invalid token'}), 401
-
-#         return f(current_user, *args, **kwargs)
-#     return decorated
 
 @app.route('/')
 def home():
     return jsonify({"data": "Welcome to the Travel Assistant API"})
 
-# @app.route('/register', methods=['POST'])
-# def register():
-#     data = request.json
-#     username = data.get('username')
-#     password = data.get('password')
-
-#     if not username or not password:
-#         return jsonify({"error": "Username and password are required"}), 400
-
-#     if users_collection.find_one({"username": username}):
-#         return jsonify({"error": "Username already exists"}), 400
-
-#     hashed_password = generate_password_hash(password, method='scrypt')
-#     users_collection.insert_one({
-#         "username": username,
-#         "password": hashed_password,
-#         "created_at": datetime.datetime.utcnow()
-#     })
-
-#     return jsonify({"message": "User registered successfully"})
-
-# @app.route('/login', methods=['POST'])
-# def login():
-#     data = request.json
-#     username = data.get('username')
-#     password = data.get('password')
-
-#     if not username or not password:
-#         return jsonify({"error": "Username and password are required"}), 400
-
-#     user = users_collection.find_one({"username": username})
-
-#     if not user or not check_password_hash(user['password'], password):
-#         return jsonify({"error": "Invalid username or password"}), 401
-
-#     token = jwt.encode(
-#         {
-#             'username': username,
-#             'exp': datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(hours=24),
-#         },
-#         SECRET_KEY,
-#         algorithm="HS256"
-#     )
-
-#     return jsonify({"token": token})
-
-# @app.route('/trips', methods=['GET', 'POST'])
-# @token_required
-# def handle_trips(current_user):
-#     if request.method == 'POST':
-#         data = request.json
-#         destination = data.get('destination')
-#         purpose = data.get('purpose')
-#         duration = data.get('duration')
-#         weather = data.get('weather')
-#         trip_date = data.get('trip_date')
-
-#         if not all([destination, purpose, duration, weather, trip_date]):
-#             return jsonify({"error": "All fields are required"}), 400
-
-#         trip = {
-#             "user_id": current_user['_id'],
-#             "username": current_user['username'],
-#             "destination": destination,
-#             "purpose": purpose,
-#             "duration": duration,
-#             "weather": weather,
-#             "trip_date": trip_date,
-#             "packing_list": [],
-#             "created_at": datetime.datetime.utcnow()
-#         }
-
-#         trip_id = trips_collection.insert_one(trip).inserted_id
-#         trip = trips_collection.find_one({"_id": trip_id})
-
-#         return json.loads(json_util.dumps(trip))
-
-#     else:
-#         # Get only the current user's trips
-#         trips = list(trips_collection.find(
-#             {"user_id": current_user['_id']}
-#         ).sort("trip_date", 1))
-#         return json.loads(json_util.dumps(trips))
-
 @app.route('/generate_packing_list', methods=['POST'])
-# @token_required
 def generate_packing_list():
     data = request.json
-    # trip_id = ObjectId(data.get('trip_id'))
     destination = data.get('destination')
     purpose = data.get('purpose')
     duration = data.get('duration')
-    # weather = data.get('weather')
-
-    # if not all([trip_id, destination, purpose, duration, weather]):
-    #     return jsonify({"error": "All fields are required"}), 400
-
-    # Verify trip belongs to current user
-    # trip = trips_collection.find_one({"_id": trip_id, "user_id": current_user['_id']})
-    # if not trip:
-    #     return jsonify({"error": "Trip not found or unauthorized"}), 404
-
-    prompt = (
-        f"Generate a packing list JSON for a {duration} trip to {destination} for {purpose} purpose."
-        f"The JSON should be a valid JSON array of objects. Each object should have: "
-        f"'name' (string), 'checked' (boolean, initially false), 'compartment' (string), and 'weight' (number in kg). "
-        f"Group items by compartments like 'Clothing', 'Electronics', 'Toiletries', 'Documents', etc. "
-        f"Ensure the output is directly parsable as a JSON array with no extra text or formatting."
-    )
-
+    traveler = data.get('traveler')
+    
+    prompt = (f"""
+              Generate a detailed packing list for a traveler going to {destination} for {duration} days for a {purpose} trip. The traveler type is {traveler}. Assume average weather for that time of year. Provide estimated item weights in grams and group items into categories. 
+              
+            Use the following JSON structure:
+            {
+            "category": "Clothing",
+            "items": [
+                {
+                "name": "3x T-Shirts",
+                "weight_grams": 600
+                },
+                {
+                "name": "2x Pants",
+                "weight_grams": 800
+                }
+            ]
+            // Add more categories like Electronics, Toiletries, Documents, Essentials
+            },
+            "total_estimated_weight_grams": 8700
+              """)
+    
     try:
         response = model.generate_content(prompt)
         packing_list = json.loads(response.text)
 
-        # Calculate total weight
-        total_weight = sum(item.get('weight', 0) for item in packing_list)
-
         return jsonify({
             "message": "Packing list generated and added to the trip",
-            "packing_list": packing_list,
-            "total_weight": total_weight
+            "packing_list": packing_list
         })
 
     except Exception as e:
         return jsonify({"error": "Failed to generate packing list", "details": str(e)}), 500
 
-# @app.route('/edit_packing_list', methods=['POST'])
-# @token_required
-# def edit_packing_list(current_user):
-#     data = request.json
-#     trip_id = ObjectId(data.get('trip_id'))
-#     items = data.get('items', [])
-
-#     if not trip_id:
-#         return jsonify({"error": "Trip ID is required"}), 400
-
-#     # Verify trip belongs to current user
-#     trip = trips_collection.find_one({"_id": trip_id, "user_id": current_user['_id']})
-#     if not trip:
-#         return jsonify({"error": "Trip not found or unauthorized"}), 404
-
-#     # Calculate total weight
-#     total_weight = sum(item.get('weight', 0) for item in items)
-
-#     trips_collection.update_one(
-#         {"_id": trip_id},
-#         {
-#             "$set": {
-#                 "packing_list": items,
-#                 "total_weight": total_weight
-#             }
-#         }
-#     )
-
-#     return jsonify({
-#         "message": "Packing list updated",
-#         "updated_items": items,
-#         "total_weight": total_weight
-#     })
-
-# @app.route('/add_packing_item', methods=['POST'])
-# @token_required
-# def add_packing_item(current_user):
-#     data = request.json
-#     trip_id = ObjectId(data.get('trip_id'))
-#     new_item = data.get('item')
-
-#     if not trip_id or not new_item:
-#         return jsonify({"error": "Trip ID and item details are required"}), 400
-
-#     # Verify trip belongs to current user
-#     trip = trips_collection.find_one({"_id": trip_id, "user_id": current_user['_id']})
-#     if not trip:
-#         return jsonify({"error": "Trip not found or unauthorized"}), 404
-
-#     # Add required fields if missing
-#     new_item.update({
-#         'checked': new_item.get('checked', False),
-#         'weight': float(new_item.get('weight', 0)),
-#         'compartment': new_item.get('compartment', 'Other')
-#     })
-
-#     # Add new item to packing list
-#     updated_list = trip.get('packing_list', []) + [new_item]
-#     total_weight = sum(item.get('weight', 0) for item in updated_list)
-
-#     trips_collection.update_one(
-#         {"_id": trip_id},
-#         {
-#             "$set": {
-#                 "packing_list": updated_list,
-#                 "total_weight": total_weight
-#             }
-#         }
-#     )
-
-#     return jsonify({
-#         "message": "Item added successfully",
-#         "updated_items": updated_list,
-#         "total_weight": total_weight
-#     })
-
-# @app.route('/delete_trip', methods=['DELETE'])
-# @token_required
-# def delete_trip(current_user):
-#     trip_id = ObjectId(request.args.get('trip_id'))
-
-#     if not trip_id:
-#         return jsonify({"error": "Trip ID is required"}), 400
-
-#     result = trips_collection.delete_one({
-#         "_id": trip_id,
-#         "user_id": current_user['_id']
-#     })
-
-#     if result.deleted_count == 1:
-#         return jsonify({"message": "Trip deleted successfully"})
-#     else:
-#         return jsonify({"error": "Trip not found or unauthorized"}), 404
-
-# @app.route('/edit_trip', methods=['PUT'])
-# @token_required
-# def edit_trip(current_user):
-#     data = request.json
-#     trip_id = ObjectId(data.get('trip_id'))
-#     updated_fields = {
-#         "destination": data.get('destination'),
-#         "purpose": data.get('purpose'),
-#         "duration": data.get('duration'),
-#         "weather": data.get('weather'),
-#         "trip_date": data.get('trip_date')
-#     }
-
-#     if not trip_id or not all(updated_fields.values()):
-#         return jsonify({"error": "Trip ID and all fields are required"}), 400
-
-#     result = trips_collection.update_one(
-#         {
-#             "_id": trip_id,
-#             "user_id": current_user['_id']
-#         },
-#         {"$set": updated_fields}
-#     )
-
-#     if result.matched_count == 1:
-#         return jsonify({"message": "Trip updated successfully"})
-#     else:
-#         return jsonify({"error": "Trip not found or unauthorized"}), 404
-
 @app.route('/get_suggestions', methods=['POST'])
-# @token_required
 def get_suggestions():
     data = request.json
     destination = data.get('destination')
     purpose = data.get('purpose')
+    duration = data.get('duration')
+    traveler = data.get('traveler')
 
     if not destination or not purpose:
         return jsonify({"error": "Destination and purpose are required"}), 400
 
-    prompt = (
-        f"Provide travel tips for a {purpose} trip to {destination}, including: "
-        f"1. Must-see places and attractions\n"
-        f"2. Local customs and etiquette\n"
-        f"3. Transportation tips\n"
-        f"4. Time management advice\n"
-        f"5. Suggested daily timeline\n"
-        f"6. Safety tips\n"
-        f"7. Local food recommendations"
-    )
+    prompt = (f"""
+              Create a detailed day-by-day travel itinerary for a traveler visiting {destination} for {duration} days. The purpose of the visit is {purpose}, and the traveler type is [TRAVELER TYPE: {traveler}]. The itinerary should include major attractions, suggested timings, local travel tips, and estimated daily expenses. You can also add Must-see places and attractions, Local customs and etiquette, Transportation tips, Safety tips.
+
+            Present the itinerary in the following JSON format:
+            {
+            "itinerary": [
+                {
+                "day": 1,
+                "title": "Day 1: Arrival and City Exploration",
+                "activities": [
+                    {
+                    "time": "9:00 AM",
+                    "description": "Check-in at hotel and freshen up"
+                    },
+                    {
+                    "time": "11:00 AM",
+                    "description": "Visit Tokyo Skytree",
+                    "estimated_cost_usd": 25
+                    }
+                ],
+                "total_estimated_cost_usd": 60
+                }
+                // More days here
+            ],
+            "local_emergency_contacts": {
+                "police": "110",
+                "ambulance": "119",
+                "fire": "119",
+                "nearest_embassy": {
+                "country": "India",
+                "phone": "+81-3-3262-2391",
+                "address": "2-2-11 Kudan-Minami, Chiyoda-ku, Tokyo 102-0074"
+                }
+            },
+            "currency_info": {
+                "local_currency": "Japanese Yen (JPY)",
+                "conversion_rate_to_ind": 0.57
+            }
+            }
+            """)
 
     try:
         response = model.generate_content(prompt)
@@ -334,6 +124,55 @@ def get_suggestions():
 
     except Exception as e:
         return jsonify({"error": "Failed to generate suggestions", "details": str(e)}), 500
+    
+@app.route('/chat', methods=['POST'])
+def get_suggestions():
+    data = request.json
+    query = data.get('query')
+    products = data.get('products')
+
+    prompt = (f"""
+        You are Jarvis, a highly intelligent and friendly AI shopping assistant for a smart luggage e-commerce website. You know every detail about every product listed in the provided product catalog (structured as JSON). You assist users by recommending products, answering queries about specifications, comparing models, and helping them choose the best item based on their needs.
+
+        When a user sends a query (like “I’m an 18-year-old student looking for a lightweight cabin bag”), extract relevant information such as age, use case, budget, travel habits, etc., and then match it with the most suitable products from the product catalog.
+
+        Always respond in a helpful and friendly tone. Provide product names, short descriptions, and direct product links. If possible, recommend 2-3 top options with different advantages (e.g., lightweight, durable, tech-enabled). Avoid generic or vague responses.
+
+        Here is the user query: {query}.
+
+        Here is the product catalog JSON: {products}.
+    """)
+    
+    try:
+        response = model.generate_content(prompt)
+        answer = response.text
+        return jsonify({"response": answer})
+
+    except Exception as e:
+        return jsonify({"error": "Failed to generate response", "details": str(e)}), 500
+    
+@app.route('/chatai', methods=['POST'])
+def get_suggestions():
+    data = request.json
+    query = data.get('query')
+
+    prompt = (f"""
+        You are a helpful, concise, and context-aware travel assistant for users who are currently traveling in a foreign country. The user will provide a real-time travel-related question (e.g., 'Where can I buy a SIM card near me?' or 'Best vegetarian restaurant in Shibuya?').
+
+        Do not give long introductions or generic travel advice. Give the answer directly and clearly in 2-4 sentences. If a list is appropriate (e.g., top restaurants), return 3-5 relevant results with names, short descriptions, and locations.
+
+        If the question is about local laws, transport, customs, or services, be precise and current. Avoid unnecessary filler text. Always assume the user is on the move and needs quick help.
+
+        Here is the user query: {query}.
+    """)
+    
+    try:
+        response = model.generate_content(prompt)
+        answer = response.text
+        return jsonify({"response": answer})
+
+    except Exception as e:
+        return jsonify({"error": "Failed to generate response", "details": str(e)}), 500
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0')
