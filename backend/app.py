@@ -33,9 +33,9 @@ def generate_packing_list():
     traveler = data.get('traveler')
     
     prompt = (f"""
-              Generate a detailed packing list for a traveler going to {destination} for {duration} days for a {purpose} trip. The traveler type is {traveler}. Assume average weather for that time of year. Provide estimated item weights in grams and group items into categories. 
+              Generate a detailed packing list for a traveler going to {destination} for {duration} days for a {purpose} trip. The traveler type is {traveler}. Assume average weather for that time of year. Provide estimated item weights in grams and group items into categories.\n""" 
               
-            Use the following JSON structure:
+            """Use the following JSON structure:
             {
             "category": "Clothing",
             "items": [
@@ -77,9 +77,9 @@ def get_suggestions():
         return jsonify({"error": "Destination and purpose are required"}), 400
 
     prompt = (f"""
-              Create a detailed day-by-day travel itinerary for a traveler visiting {destination} for {duration} days. The purpose of the visit is {purpose}, and the traveler type is [TRAVELER TYPE: {traveler}]. The itinerary should include major attractions, suggested timings, local travel tips, and estimated daily expenses. You can also add Must-see places and attractions, Local customs and etiquette, Transportation tips, Safety tips.
+              Create a detailed day-by-day travel itinerary for a traveler visiting {destination} for {duration} days. The purpose of the visit is {purpose}, and the traveler type is [TRAVELER TYPE: {traveler}]. The itinerary should include major attractions, suggested timings, local travel tips, and estimated daily expenses. You can also add Must-see places and attractions, Local customs and etiquette, Transportation tips, Safety tips.\n"""
 
-            Present the itinerary in the following JSON format:
+            """Present the itinerary in the following JSON format:
             {
             "itinerary": [
                 {
@@ -126,7 +126,7 @@ def get_suggestions():
         return jsonify({"error": "Failed to generate suggestions", "details": str(e)}), 500
     
 @app.route('/chat', methods=['POST'])
-def get_suggestions():
+def chat():
     data = request.json
     query = data.get('query')
     products = data.get('products')
@@ -152,7 +152,7 @@ def get_suggestions():
         return jsonify({"error": "Failed to generate response", "details": str(e)}), 500
     
 @app.route('/chatai', methods=['POST'])
-def get_suggestions():
+def chatai():
     data = request.json
     query = data.get('query')
 
